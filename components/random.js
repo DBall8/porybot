@@ -45,8 +45,8 @@ function randomCmd(message, args)
 }
 
 var shouldHelp =
-    "**!should** <question>\n"
-    "--- Answers a yes or no question\n"
+    "**!should** <question>\n" +
+    "--- Answers a yes or no question\n";
 
 function shouldCmd(message, args)
 {

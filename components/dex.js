@@ -89,7 +89,7 @@ function sendPokeData(channel, data, includeImage)
     statsInfo += " [Spe]: " + stats["speed"] + "\n";
     statsInfo += "\n";
 
-    if (includeImage)
+    if (includeImage && dataJson.sprites.other['official-artwork'].front_default)
     {
         channel.send(dataJson.sprites.other['official-artwork'].front_default);
     }

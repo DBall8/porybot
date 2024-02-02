@@ -3,8 +3,8 @@ var discord = require('discord.js'),
     porybase = require('./components/porybase.js'),
     poetry = require('./components/poetry.js'),
     images = require('./components/images.js'),
-    randomCommands = require('./components/random.js'),
-    remindCommand = require('./components/remind.js'),
+    random = require('./components/random.js'),
+    remind = require('./components/remind.js'),
     dex = require('./components/dex.js')
 
 var commands = [];
@@ -139,7 +139,7 @@ function startBot()
     poryBot.on("ready", () =>
     {
         console.log("Connected!");
-        remindCommand.init(poryBot);
+        remind.init(poryBot);
     })
 
     poryBot.on("message", handleMessage);
@@ -147,14 +147,14 @@ function startBot()
     poryBot.login(auth.token);
 }
 
-addCommand("help",   helpCmd);
-addCommand("echo",   echoCmd,   echoHelp);
-addCommand("remind", remindCommand.cmd, remindCommand.help);
-addCommand("poem",   poemCmd,   poemHelp);
-addCommand("coinflip", randomCommands.coinflip.cmd, randomCommands.coinflip.help);
-addCommand("random", randomCommands.random.cmd, randomCommands.random.help);
-addCommand("should", randomCommands.should.cmd, randomCommands.should.help);
-addCommand("dex",    dex.cmd, dex.help);
+addCommand("help",     helpCmd);
+//addCommand("echo",     echoC                echoHelp);
+addCommand("remind",   remind.cmd,          remind.help);
+addCommand("poem",     poemCmd,             poemHelp);
+addCommand("coinflip", random.coinflip.cmd, random.coinflip.help);
+addCommand("random",   random.random.cmd,   random.random.help);
+addCommand("should",   random.should.cmd,   random.should.help);
+addCommand("dex",      dex.cmd,             dex.help);
 
 porybase.init()
     .then(() =>
