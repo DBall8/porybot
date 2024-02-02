@@ -1,0 +1,15 @@
+{
+  "name": "pory-bot",
+  "version": "1.0.0",
+  "description": "My Discord bot for tesing commands",
+  "main": "pory.js",
+  "author": "dball",
+  "dependencies": {
+    "discord.io": "^2.5.3",
+    "discord.js": "^11.2.1",
+    "node-fetch": "^2.6.1",
+    "rita": "^2.4.86",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
+  }
+}
