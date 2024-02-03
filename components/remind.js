@@ -20,8 +20,6 @@ function remindInit(porybot)
                             return;
                         }
                         
-                        channel.send("Loaded for: " + reminder.message);
-
                         setTimeout(() =>
                             {
                                 sendReminder(reminder.id, channel, reminder.message);
@@ -57,9 +55,9 @@ function sendReminder(reminderId, channel, text)
 
 function setReminder(channel, reminderId, timeMs, immediateText, laterText)
 {
-    porybase.getReminders()
-        .then((reminders) => console.log(reminders))
-        .catch((err) => console.log("ERROR: " + err));
+//     porybase.getReminders()
+//         .then((reminders) => console.log(reminders))
+//         .catch((err) => console.log("ERROR: " + err));
 
     channel.send(immediateText);
 
