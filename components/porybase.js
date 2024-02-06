@@ -1,6 +1,6 @@
 var sqlite = require('sqlite3');
 
-var DB_PATH = "./porybase.db";
+var DB_PATH = __dirname + "/porybase.db";
 
 var Database = null;
 
