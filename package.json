@@ -7,6 +7,7 @@
   "dependencies": {
     "discord.io": "^2.5.3",
     "discord.js": "^11.2.1",
+    "googleapis": "^132.0.0",
     "node-fetch": "^2.6.1",
     "rita": "^2.4.86",
     "sqlite": "^5.1.1",

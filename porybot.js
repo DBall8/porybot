@@ -5,7 +5,8 @@ var discord = require('discord.js'),
     images = require('./components/images.js'),
     random = require('./components/random.js'),
     remind = require('./components/remind.js'),
-    dex = require('./components/dex.js')
+    dex = require('./components/dex.js'),
+    yt = require('./components/yt.js')
 
 var commands = [];
 
@@ -48,22 +49,6 @@ function echoCmd(message, args)
     }
 }
 
-var remindHelp = 
-    "**!remind** <person> <number> <minutes | hours | days ...> <message>\n" +
-    "--- Have a reminder sent after a certain period of time. Use 'me' to ping yourself\n";
-
-function remindCmd(message, args)
-{
-    if (args.length < 5)
-    {
-        remindHelp(message.channel);
-        return;
-    }
-
-    let remindMsg = message.author + " " + args[4];
-    message.channel.send(remindMsg);
-}
-
 var poemHelp = 
     "**!poem** [topic] [-i]\n" +
     "--- Generates a random poem, with an optional topic. Include -i to add an image\n";
@@ -72,12 +57,19 @@ function poemCmd(message, args)
 {
     let topic = null;
     let includeImage = false;
+    let random = false;
 
     for (let i=1; i<args.length; i++)
     {
         if (args[i] === '-i')
         {
             includeImage = true;
+            continue;
+        }
+
+        if (args[i] === 'random')
+        {
+            random = true;
             continue;
         }
         
@@ -87,7 +79,7 @@ function poemCmd(message, args)
         }
     }
 
-    poetry.generatePoem(topic)
+    poetry.generatePoem(topic, random)
     .then((result) =>
     {
         if (includeImage)
@@ -155,6 +147,7 @@ addCommand("coinflip", random.coinflip.cmd, random.coinflip.help);
 addCommand("random",   random.random.cmd,   random.random.help);
 addCommand("should",   random.should.cmd,   random.should.help);
 addCommand("dex",      dex.cmd,             dex.help);
+addCommand("yt",       yt.cmd,              yt.help);
 
 porybase.init()
     .then(() =>
