@@ -8,7 +8,7 @@ const GNOME_WAV = "./audio/gnome-reverb.wav";
 const player = discordVoice.createAudioPlayer();
 
 const HOUR_MS = 1000 * 60 * 60;
-const DEFAULT_MIN_TIME = HOUR_MS * 1;
+const DEFAULT_MIN_TIME = HOUR_MS * 0.25;
 const DEFAULT_MAX_TIME = HOUR_MS * 3;
 
 var gnomeTimer = null;
