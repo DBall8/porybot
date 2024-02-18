@@ -4,7 +4,7 @@ var gnomeHelp =
     "**!gnome** [leave]\n" +
     "--- Joins a voice channel to periodically 'woo', use '!gnome leave' to make it stop\n";
 
-const GNOME_WAV = "./audio/gnome-reverb.wav";
+const GNOME_WAV = __dirname + "/../audio/gnome-reverb.wav";
 const player = discordVoice.createAudioPlayer();
 
 const HOUR_MS = 1000 * 60 * 60;
@@ -16,7 +16,7 @@ var minTime = DEFAULT_MIN_TIME;
 var maxTime = DEFAULT_MAX_TIME;
 
 
-function gnomeLoop()
+async function gnomeLoop()
 {
     if (gnomeTimer)
     {
@@ -25,7 +25,7 @@ function gnomeLoop()
 
     try
     {
-        playSound(GNOME_WAV);
+        await playSound(GNOME_WAV);
     }
     catch(error)
     {
