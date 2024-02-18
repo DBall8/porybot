@@ -1,0 +1,9 @@
+# Databases
+*.db
+
+# Secret files
+auth.json
+
+# Modules
+/node_modules
+

@@ -6,7 +6,8 @@ var discord = require('discord.js'),
     random = require('./components/random.js'),
     remind = require('./components/remind.js'),
     dex = require('./components/dex.js'),
-    yt = require('./components/yt.js')
+    yt = require('./components/yt.js'),
+    audio = require('./components/audio.js')
 
 var commands = [];
 
@@ -31,7 +32,7 @@ function helpCmd(message)
             helpText = helpText + "\n" + commands[i].help;
         }
     }
-    message.channel.send(helpText);
+    message.reply(helpText);
 }
     
 
@@ -126,7 +127,10 @@ function handleMessage(message)
 
 function startBot()
 {
-    var poryBot = new discord.Client();
+    var poryBot = new discord.Client(
+        {
+            intents: [discord.Intents.FLAGS.GUILDS, discord.Intents.FLAGS.GUILD_MESSAGES, discord.Intents.FLAGS.GUILD_VOICE_STATES]
+        });
 
     poryBot.on("ready", () =>
     {
@@ -134,7 +138,7 @@ function startBot()
         remind.init(poryBot);
     })
 
-    poryBot.on("message", handleMessage);
+    poryBot.on("messageCreate", handleMessage);
 
     poryBot.login(auth.token);
 }
@@ -148,6 +152,7 @@ addCommand("random",   random.random.cmd,   random.random.help);
 addCommand("should",   random.should.cmd,   random.should.help);
 addCommand("dex",      dex.cmd,             dex.help);
 addCommand("yt",       yt.cmd,              yt.help);
+addCommand("gnome",    audio.gnome.cmd,     audio.gnome.help);
 
 porybase.init()
     .then(() =>

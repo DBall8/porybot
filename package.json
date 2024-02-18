@@ -5,10 +5,13 @@
   "main": "pory.js",
   "author": "dball",
   "dependencies": {
+    "@discordjs/voice": "^0.16.1",
     "discord.io": "^2.5.3",
-    "discord.js": "^11.2.1",
+    "discord.js": "^13.7.1",
     "googleapis": "^132.0.0",
+    "libsodium-wrappers": "^0.7.13",
     "node-fetch": "^2.6.1",
+    "prism-media": "^2.0.0-alpha.0",
     "rita": "^2.4.86",
     "sqlite3": "^5.1.7"
   }
