@@ -16,7 +16,7 @@ function ytCmd(message, args)
 {
     if (args.length <= 1)
     {
-        message.channel.send(ytHelp);
+        message.reply(ytHelp);
         return;
     }
 
@@ -32,19 +32,19 @@ function ytCmd(message, args)
         if (!res || (res.status != 200)) 
         {
             console.log(res);
-            message.channel.send("Sorry, could not reach youtube.\n");
+            message.reply("Sorry, could not reach youtube.\n");
             return;
         }
 
         if (!res.data || !res.data.items || (res.data.items.length < 1))
         {
             console.log(res);
-            message.channel.send("Sorry, something went wrong.");
+            message.reply("Sorry, something went wrong.");
             return;
         }
 
         let url = YT_URL + res.data.items[0].id.videoId;
-        message.channel.send(url);
+        message.reply(url);
         
     }).catch((err) =>
     {

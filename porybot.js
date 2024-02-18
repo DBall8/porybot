@@ -46,7 +46,7 @@ function echoCmd(message, args)
     let echoString = message.content.slice(cmdNameLen+1);
     if (echoString.length > 0)
     {
-        message.channel.send(echoString);
+        message.reply(echoString);
     }
 }
 
@@ -93,19 +93,19 @@ function poemCmd(message, args)
             })
             .catch((error) => 
             {
-                message.channel.send(error);
-                message.channel.send(result.poem);
+                message.reply(error);
+                message.reply(result.poem);
             });
         }
         else
         {
-            message.channel.send(result.poem);
+            message.reply(result.poem);
         }
 
     })
     .catch((error) =>
     {
-        message.channel.send("Could not create poem: " + error);
+        message.reply("Could not create poem: " + error);
     })
 }
 

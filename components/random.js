@@ -8,7 +8,7 @@ function coinflipCmd(message, args)
     let result = "Flipping a coin... and its... ";
     result = result + ((number >= 0.5) ? "HEADS" : "TAILS");
 
-    message.channel.send(result);
+    message.reply(result);
 }
 
 var randomHelp = 
@@ -19,7 +19,7 @@ function randomCmd(message, args)
 {
     if (args.length < 2)
     {
-        message.channel.send(randomHelp);
+        message.reply(randomHelp);
         return;
     }
 
@@ -41,7 +41,7 @@ function randomCmd(message, args)
     rand = rand + min;
     rand = Math.round(rand);
 
-    message.channel.send("Your random value between " + min + " and " + max + " is: " + rand);
+    message.reply("Your random value between " + min + " and " + max + " is: " + rand);
 }
 
 var shouldHelp =
@@ -52,7 +52,7 @@ function shouldCmd(message, args)
 {
     if (args.length < 2)
     {
-        message.channel.send(shouldHelp);
+        message.reply(shouldHelp);
         return;
     }
 
@@ -60,11 +60,11 @@ function shouldCmd(message, args)
 
     if (rand >= 0.5)
     {
-        message.channel.send("Yes, defintely!");
+        message.reply("Yes, defintely!");
     }
     else
     {
-        message.channel.send("No, abslutely not");
+        message.reply("No, abslutely not");
     }
 }
 

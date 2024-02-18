@@ -76,7 +76,7 @@ function remindCmd(message, args)
 {
     if (args < 4)
     {
-        message.channel.send(remindHelp);
+        message.reply(remindHelp);
         return;
     }
 
@@ -92,7 +92,7 @@ function remindCmd(message, args)
     let number = Number(args[1]);
     if (number == NaN)
     {
-        message.channel.send(remindHelp);
+        message.reply(remindHelp);
         return;
     }
 
@@ -119,7 +119,7 @@ function remindCmd(message, args)
     }
     else
     {
-        message.channel.send("Please use minutes, hours, days, or weeks");
+        message.reply("Please use minutes, hours, days, or weeks");
         return;
     }
 

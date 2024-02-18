@@ -39,7 +39,7 @@ var TYPE_COLOR_MAP =
         "fairy":    PINK
     };
 
-function sendPokeData(channel, data, includeImage)
+function sendPokeData(message, data, includeImage)
 {
     let dataJson = JSON.parse(data);
     let name = dataJson.name;
@@ -91,10 +91,10 @@ function sendPokeData(channel, data, includeImage)
 
     if (includeImage && dataJson.sprites.other['official-artwork'].front_default)
     {
-        channel.send(dataJson.sprites.other['official-artwork'].front_default);
+        message.channel.send(dataJson.sprites.other['official-artwork'].front_default);
     }
 
-    channel.send(DATA_OPEN + basicInfo + statsInfo + DATA_CLOSE);
+    message.channel.send(DATA_OPEN + basicInfo + statsInfo + DATA_CLOSE);
 }
 
 var dexHelp = 
@@ -105,7 +105,7 @@ function dexCmd(message, args)
 {
     if (args.length < 2)
     {
-        message.channel.send(dexHelp);
+        message.reply(dexHelp);
         return;
     }
 
@@ -122,13 +122,13 @@ function dexCmd(message, args)
         {
             if (response.statusCode == 404)
             {
-                message.channel.send("Pokemon [" + pokemon + "] not found.");
+                message.reply("Pokemon [" + pokemon + "] not found.");
                 return;
             }
 
             if (response.statusCode != 200)
             {
-                message.channel.send("Failed due to unknown error.");
+                message.reply("Failed due to unknown error.");
                 return;
             }
 
@@ -140,7 +140,7 @@ function dexCmd(message, args)
 
             response.on("end", () =>
                 {
-                    sendPokeData(message.channel, pokeData, includeImage);
+                    sendPokeData(message, pokeData, includeImage);
                 });
 
         }).on("error", (err) => 
