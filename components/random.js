@@ -36,6 +36,12 @@ function randomCmd(message, args)
         max = Math.max(args[1], args[2]);
     }
 
+    if (isNaN(min) || isNaN(max))
+    {
+        message.reply("Please give numbers only...");
+        return
+    }
+
     let rand = Math.random();
     rand = rand * (max - min);
     rand = rand + min;
@@ -60,11 +66,11 @@ function shouldCmd(message, args)
 
     if (rand >= 0.5)
     {
-        message.reply("Yes, defintely!");
+        message.reply("Yes, definitely!");
     }
     else
     {
-        message.reply("No, abslutely not");
+        message.reply("No, absolutely not");
     }
 }
 
