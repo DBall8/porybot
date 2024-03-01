@@ -5,7 +5,7 @@ var discord = require('discord.js'),
     images = require('./components/images.js'),
     random = require('./components/random.js'),
     remind = require('./components/remind.js'),
-    dex = require('./components/dex.js'),
+    pokemon = require('./components/pokemon.js'),
     yt = require('./components/yt.js'),
     audio = require('./components/audio.js')
 
@@ -150,10 +150,12 @@ addCommand("poem",     poemCmd,             poemHelp);
 addCommand("coinflip", random.coinflip.cmd, random.coinflip.help);
 addCommand("random",   random.random.cmd,   random.random.help);
 addCommand("should",   random.should.cmd,   random.should.help);
-addCommand("dex",      dex.cmd,             dex.help);
+addCommand("dex",      pokemon.dex.cmd,     pokemon.dex.help);
+addCommand("call",     pokemon.call.cmd,    pokemon.call.help);
 addCommand("yt",       yt.cmd,              yt.help);
 addCommand("gnome",    audio.gnome.cmd,     audio.gnome.help);
 
+pokemon.init();
 porybase.init()
     .then(() =>
     {

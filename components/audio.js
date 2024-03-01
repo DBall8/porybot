@@ -5,7 +5,7 @@ var gnomeHelp =
     "--- Joins a voice channel to periodically 'woo', use '!gnome leave' to make it stop\n";
 
 const GNOME_WAV = __dirname + "/../audio/gnome-reverb.wav";
-const player = discordVoice.createAudioPlayer();
+const gnomePlayer = discordVoice.createAudioPlayer();
 
 const HOUR_MS = 1000 * 60 * 60;
 const DEFAULT_MIN_TIME = HOUR_MS * 0.25;
@@ -15,6 +15,20 @@ var gnomeTimer = null;
 var minTime = DEFAULT_MIN_TIME;
 var maxTime = DEFAULT_MAX_TIME;
 
+var activeGnomeChannels = [];
+
+function isGnomeActive(channelId)
+{
+    for (let i=0; i<activeGnomeChannels.length; i++)
+    {
+        if (activeGnomeChannels[i] === channelId)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 async function gnomeLoop()
 {
@@ -25,7 +39,7 @@ async function gnomeLoop()
 
     try
     {
-        await playSound(GNOME_WAV);
+        await playSound(gnomePlayer, GNOME_WAV);
     }
     catch(error)
     {
@@ -37,7 +51,7 @@ async function gnomeLoop()
     gnomeTimer = setTimeout(gnomeLoop, delay);
 }
 
-function playSound(soundFile)
+function playSound(player, soundFile)
 {
     const resource = discordVoice.createAudioResource(
         soundFile,
@@ -86,6 +100,7 @@ async function gnomeCommand(message, args)
         {
             voiceConnection.destroy();
         }
+        activeGnomeChannels = activeGnomeChannels.filter((id) => { return id != channel.id; });
         return;
     }
 
@@ -107,7 +122,7 @@ async function gnomeCommand(message, args)
     try
     {
         voiceConnection = await joinChannel(channel);
-        voiceConnection.subscribe(player);
+        voiceConnection.subscribe(gnomePlayer);
     }
     catch (error)
     {
@@ -116,7 +131,54 @@ async function gnomeCommand(message, args)
         console.error(error);
     }
 
+    activeGnomeChannels.push(channel.id);
     gnomeLoop(message.guild.id);
+}
+
+async function playPokeCall(message, audioFile)
+{
+
+    let channel = message.member?.voice.channel;
+    if (!channel)
+    {
+        message.reply("Please join a voice channel first.");
+        return;
+    }
+
+    let voiceConnection = null;
+    let callPlayer = discordVoice.createAudioPlayer();
+    try
+    {
+        voiceConnection = await joinChannel(channel);
+        voiceConnection.subscribe(callPlayer);
+    }
+    catch (err)
+    {
+        message.reply("Encountered an error...");
+        console.error("Failed to subscribe call player");
+        console.error(error);
+    }
+
+    try
+    {
+        callPlayer.on(discordVoice.AudioPlayerStatus.Idle, () =>
+            {
+                callPlayer.stop();
+                if (!isGnomeActive(channel.id))
+                {
+                    voiceConnection.destroy();
+                } 
+
+            });
+        await playSound(callPlayer, audioFile);
+    }
+    catch(error)
+    {
+        
+        message.reply("Encountered an error...");
+        console.error("Failed to play poke call"); 
+        console.error(error);
+    }
 }
 
 exports.gnome =
@@ -124,3 +186,5 @@ exports.gnome =
     help: gnomeHelp,
     cmd:  gnomeCommand
 };
+
+exports.playPokeCall = playPokeCall;
