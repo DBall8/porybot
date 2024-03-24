@@ -222,13 +222,18 @@ var callHelp =
 
 async function callCmd(message, args)
 {
-    if (args.length < 2)
+    let pokemon = "";
+    if (args.length == 1)
     {
-        message.reply("Please specify a pokemon");
-        return;
+        let randomNum = Math.round(Math.random() * POKE_NAMES.length);
+        pokemon = POKE_NAMES[randomNum];
+        message.reply("Playing: " + pokemon);
     }
-    
-    let pokemon = args[1];
+    else
+    {
+        pokemon = args[1];
+    }
+
     if (pokemon && (POKE_NAMES.length > 0))
     {
         pokemon = fuzzySearch.search(pokemon, POKE_NAMES);
