@@ -9,7 +9,7 @@ function remindInit(porybot)
                 {
                     if (!reminder || !reminder.channelId) return;
 
-                    porybot.channels.map((channel) => 
+                    porybot.channels.cache.map((channel) => 
                     {
                         if (channel.id !== reminder.channelId) return;
 
@@ -86,7 +86,7 @@ function remindCmd(message, args)
         text += args[i] + " ";
     }
 
-    text = message.author + " reminder: " + text;
+    text = message.author.toString() + " reminder: " + text;
 
     let timeMs = 0;
     let number = Number(args[1]);
