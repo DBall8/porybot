@@ -2,13 +2,14 @@ var fetch = require('node-fetch');
 
 async function cardCmd(message, args)
 {
+    let cardName = "";
     args.forEach(element => {
-        message.channel.send("" + element);
+        cardName = cardName + element + " ";
     });
-    searchCard(args[0])
+    searchCard(cardName)
     .then((card) => {message.channel.send(card.image);})
     .catch((err) => {
-        message.channel.send("Failed to find card image.");
+        message.channel.send("Failed to find card image: " + err);
     });
 }
 
@@ -29,7 +30,7 @@ function searchCard(searchTerm) {
 
 var cardHelp = 
     "**!card** <card name>\n" +
-    "---- Get an image of a MTG card based on its name\n";
+    "--- Get an image of a MTG card based on its name\n";
 
 exports.card =
     {
