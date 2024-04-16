@@ -7,7 +7,8 @@ var discord = require('discord.js'),
     remind = require('./components/remind.js'),
     pokemon = require('./components/pokemon.js'),
     yt = require('./components/yt.js'),
-    audio = require('./components/audio.js')
+    audio = require('./components/audio.js'),
+    magic = require('./components/magic.js')
 
 var commands = [];
 
@@ -154,6 +155,7 @@ addCommand("dex",      pokemon.dex.cmd,     pokemon.dex.help);
 addCommand("call",     pokemon.call.cmd,    pokemon.call.help);
 addCommand("yt",       yt.cmd,              yt.help);
 addCommand("gnome",    audio.gnome.cmd,     audio.gnome.help);
+addCommand("card",    magic.card.cmd,     magic.card.help);
 
 pokemon.init();
 porybase.init()
