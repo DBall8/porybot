@@ -1,3 +1,5 @@
+var fetch = require('node-fetch');
+
 async function cardCmd(message, args)
 {
     searchCard(args[0])
@@ -13,10 +15,11 @@ function searchCard(searchTerm) {
             if(!response.ok) {
                 reject("[Scryfall API failed]");
             }
-            return response.json();
-        })
-        .then(data => {
+            let data = response.json();
             resolve({image: data.image_uris.small});
+        })
+        .catch((err) => {
+            reject("Failed to find card image.");
         });
     });
 }
