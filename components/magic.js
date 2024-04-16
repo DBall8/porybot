@@ -2,10 +2,13 @@ var fetch = require('node-fetch');
 
 async function cardCmd(message, args)
 {
+    args.forEach(element => {
+        message.channel.send("" + element);
+    });
     searchCard(args[0])
     .then((card) => {message.channel.send(card.image);})
     .catch((err) => {
-        message.channel.send("error: " + err);
+        message.channel.send("Failed to find card image.");
     });
 }
 
