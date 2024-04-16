@@ -6,6 +6,7 @@ async function cardCmd(message, args)
     args.forEach(element => {
         cardName = cardName + element + " ";
     });
+    message.channel.send(cardName);
     searchCard(cardName)
     .then((card) => {message.channel.send(card.image);})
     .catch((err) => {
@@ -23,7 +24,7 @@ function searchCard(searchTerm) {
             resolve({image: data.image_uris.small});
         })
         .catch((err) => {
-            reject("[Scryfall API failed]:" + err);
+            reject("[Scryfall API failed]: " + err);
         });
     });
 }
