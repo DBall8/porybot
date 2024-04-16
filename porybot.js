@@ -155,7 +155,7 @@ addCommand("dex",      pokemon.dex.cmd,     pokemon.dex.help);
 addCommand("call",     pokemon.call.cmd,    pokemon.call.help);
 addCommand("yt",       yt.cmd,              yt.help);
 addCommand("gnome",    audio.gnome.cmd,     audio.gnome.help);
-addCommand("card",    magic.card.cmd,     magic.card.help);
+addCommand("card",     magic.card.cmd,      magic.card.help);
 
 pokemon.init();
 porybase.init()
