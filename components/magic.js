@@ -5,7 +5,7 @@ async function cardCmd(message, args)
     searchCard(args[0])
     .then((card) => {message.channel.send(card.image);})
     .catch((err) => {
-        message.channel.send("Failed to search for card image.");
+        message.channel.send("error: " + err);
     });
 }
 
