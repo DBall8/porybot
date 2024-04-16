@@ -23,7 +23,7 @@ function searchCard(searchTerm) {
             resolve({image: data.image_uris.small});
         })
         .catch((err) => {
-            reject("[Scryfall API failed]");
+            reject("[Scryfall API failed]:" + err);
         });
     });
 }
