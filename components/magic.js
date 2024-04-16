@@ -15,14 +15,11 @@ function searchCard(searchTerm) {
         let searchLink = "https://api.scryfall.com/cards/named?fuzzy=" + searchTerm;
         fetch(searchLink)
         .then(response => {
-            if(!response.ok) {
-                reject("[Scryfall API failed]");
-            }
             let data = response.json();
             resolve({image: data.image_uris.small});
         })
         .catch((err) => {
-            reject("Failed to find card image.");
+            reject("[Scryfall API failed]");
         });
     });
 }
