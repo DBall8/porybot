@@ -4,9 +4,8 @@ async function cardCmd(message, args)
 {
     let cardName = "";
     for(let i = 1; i < args.length; i++) {
-        cardName = cardName + element + " ";
+        cardName = cardName + args[i] + " ";
     }
-    message.channel.send(cardName);
     searchCard(cardName)
     .then((card) => {message.channel.send(card.image);})
     .catch((err) => {
