@@ -7,7 +7,7 @@ async function cardCmd(message, args)
         cardName = cardName + args[i] + " ";
     }
     searchCard(cardName)
-    .then((card) => {message.channel.send(card.image_uris.small);})
+    .then((card) => {message.channel.send(card.image_uris.normal);})
     .catch((err) => {
         message.channel.send("Failed to find card image.");
     });
