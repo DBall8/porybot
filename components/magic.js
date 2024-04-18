@@ -7,7 +7,13 @@ async function cardCmd(message, args)
         cardName = cardName + args[i] + " ";
     }
     searchCard(cardName)
-    .then((card) => {message.channel.send(card.image_uris.normal);})
+    .then((card) => {
+        if(card && card.image_uris && card.image_uris.normal) {
+            message.channel.send(card.image_uris.normal);
+        } else {
+            message.channel.send("Failed to find card image.");
+        }
+    })
     .catch((err) => {
         message.channel.send("Failed to find card image.");
     });
@@ -19,8 +25,12 @@ function searchCard(searchTerm) {
         let searchLink = "https://api.scryfall.com/cards/named?fuzzy=" + searchTerm;
         fetch(searchLink)
         .then(response => {
-            let data = response.json();
-            resolve(data);
+            if(response) {
+                let data = response.json();
+                resolve(data);
+            } else {
+                reject("No valid response.");
+            }
         })
         .catch((err) => {
             reject("[Scryfall API failed]: " + err);
