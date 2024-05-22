@@ -10,7 +10,11 @@ async function cardCmd(message, args)
     .then((card) => {
         if(card && card.image_uris && card.image_uris.normal) {
             message.channel.send(card.image_uris.normal);
-        } else {
+        }
+        else if(card && card.type == "ambiguous") {
+            message.channel.send(card.details);
+        } 
+        else {
             message.channel.send("Failed to find card image.");
         }
     })
