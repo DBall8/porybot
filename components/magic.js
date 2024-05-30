@@ -11,6 +11,22 @@ async function cardCmd(message, args)
         if(card && card.image_uris && card.image_uris.normal) {
             message.channel.send(card.image_uris.normal);
         }
+        else if(card && card.card_faces) {
+            // show each side of a double sided card
+            let allImages = "";
+            for(let i = 0; i < card.card_faces.length; i++) {
+                if(card.card_faces[i] && card.card_faces[i].image_uris && card.card_faces[i].image_uris.normal) {
+                    allImages += card.card_faces[i].image_uris.normal + " ";
+                }
+            }
+
+            if(allImages == "") {
+                message.channel.send("Failed to gather card images.");
+            }
+            else {
+                message.channel.send(allImages);
+            }
+        }
         else if(card && card.type == "ambiguous") {
             message.channel.send(card.details);
         } 
