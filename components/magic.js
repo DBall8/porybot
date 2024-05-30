@@ -13,18 +13,16 @@ async function cardCmd(message, args)
         }
         else if(card && card.card_faces) {
             // show each side of a double sided card
-            let allImages = "";
+            let sentImage = false;
             for(let i = 0; i < card.card_faces.length; i++) {
                 if(card.card_faces[i] && card.card_faces[i].image_uris && card.card_faces[i].image_uris.normal) {
-                    allImages += card.card_faces[i].image_uris.normal + " ";
+                    message.channel.send(card.card_faces[i].image_uris.normal);
+                    sentImage = true;
                 }
             }
 
-            if(allImages == "") {
+            if(!sentImage) {
                 message.channel.send("Failed to gather card images.");
-            }
-            else {
-                message.channel.send(allImages);
             }
         }
         else if(card && card.type == "ambiguous") {
