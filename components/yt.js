@@ -6,6 +6,8 @@ const {google} = require('googleapis');
 const YT_URL = "https://www.youtube.com/watch?v=";
 const DL_PATH = "./audio/"
 
+const MAX_AUDIO_SIZE = (100 * 1024 * 1024); // 100 MB
+
 var ytHelp =
     "**!yt** <search>\n" +
     "--- Gets the first result from Youtube for the given search\n";
@@ -14,13 +16,6 @@ const youtube = google.youtube({
     version: 'v3',
     auth: auth.google_api_key
 });
-
-function testCmd(message, args)
-{
-    ytDownload(args[1], "testNew").then((filename) => console.log("Downloaded to " + filename));
-}
-
-const testHelp = "HELLO\n"
 
 async function download(url, filename)
 {
@@ -49,6 +44,8 @@ async function download(url, filename)
         return;
     }
 
+    let title = info.player_response.videoDetails.title;
+
     let audioFormats = ytdl.filterFormats(info.formats, "audioonly");
     if (!audioFormats)
     {
@@ -63,6 +60,12 @@ async function download(url, filename)
         return;
     }
 
+    if (format.contentLength > MAX_AUDIO_SIZE)
+    {
+        console.error("YTDL: Requested audio is too large");
+        return;
+    }
+
     let fullFileName = filename + "." + format.container;
     let writeStream = fs.createWriteStream(DL_PATH + fullFileName);
     let dlStream = ytdl.downloadFromInfo(info, {format: format})
@@ -73,8 +76,50 @@ async function download(url, filename)
             console.error(error);
         });
     await dlStream.pipe(writeStream);
-    return fullFileName;
+
+    return {
+        filename: fullFileName,
+        title: title
+    };
 }
+
+async function search(query)
+{
+
+    try
+    {
+        let res = await youtube.search.list({
+            part: 'id,snippet',
+            type: 'video',
+            maxResults: 1,
+            q: query
+        });
+
+        if (!res || (res.status != 200)) 
+        {
+            console.error("YT search bad result:");
+            console.error(res);
+            return;
+        }
+
+        if (!res.data || !res.data.items || (res.data.items.length < 1))
+        {
+            console.error("YT search bad data");
+            console.error(res);
+            return;
+        }
+
+        let url = YT_URL + res.data.items[0].id.videoId;
+        return url;
+    } 
+    catch(err)
+    {
+        console.error("YT search error:");
+        console.error(err);
+        return null;
+    }
+}
+
 function ytCmd(message, args)
 {
     if (args.length <= 1)
@@ -118,5 +163,4 @@ function ytCmd(message, args)
 exports.help = ytHelp;
 exports.cmd = ytCmd;
 exports.download = download;
-exports.testHelp = testHelp;
-exports.testCmd = testCmd;
+exports.search = search;

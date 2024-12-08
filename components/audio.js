@@ -11,13 +11,48 @@ const gnomePlayer = discordVoice.createAudioPlayer();
 
 const HOUR_MS = 1000 * 60 * 60;
 const DEFAULT_MIN_TIME = HOUR_MS * 0.25;
-const DEFAULT_MAX_TIME = HOUR_MS * 3;
+const DEFAULT_MAX_TIME = HOUR_MS * 1;
 
 var gnomeTimer = null;
 var minTime = DEFAULT_MIN_TIME;
 var maxTime = DEFAULT_MAX_TIME;
 
 var activeGnomeChannels = [];
+var activePlayers = {};
+
+function addActivePlayer(channelId, voiceConn, player)
+{
+    activePlayers[channelId] = 
+        {
+            voice: voiceConn,
+            player: player
+        };
+}
+
+function stopPlayer(channelId, shouldLeave)
+{
+    if (!(channelId in activePlayers))
+    {
+        return;
+    }
+
+    if (!activePlayers[channelId])
+    {
+        delete activePlayers[channelId];
+        return;
+    }
+
+    if (activePlayers[channelId].player)
+    {
+        activePlayers[channelId].player.stop();
+    }
+
+    if (shouldLeave && activePlayers[channelId].voice)
+    {
+        activePlayers[channelId].voice.destroy();
+        delete activePlayers[channelId];
+    }
+}
 
 function isGnomeActive(channelId)
 {
@@ -139,7 +174,7 @@ async function gnomeCommand(message, args)
 
 
 var playHelp =
-    "**!play** <yt_url | stop | leave>\n" +
+    "**!play** <yt_url | search_term | 'stop' | 'leave'>\n" +
     "--- Plays the audio from the given youtube url. Use 'stop' or 'leave' to stop playing\n" 
 
 async function playCmd(message, args)
@@ -150,6 +185,7 @@ async function playCmd(message, args)
         return;
     }
 
+
     let channel = message.member?.voice.channel;
     if (!channel)
     {
@@ -157,12 +193,37 @@ async function playCmd(message, args)
         return;
     }
 
-    let ytUrl = args[1];
-    let audioFile;
+    if (args[1] === 'stop')
+    {
+        stopPlayer(channel.id, false);
+        return;
+    }
 
+    if (args[1] === 'leave')
+    {
+        stopPlayer(channel.id, true);
+        return;
+    }
+
+    let ytUrl = args[1];
+
+    if (!ytUrl.includes("youtube.com"))
+    {
+        // Not given a url, search this term instead
+        let query = message.content.slice(args[0].length + 1);
+        ytUrl = await yt.search(query);
+    }
+
+    if (!ytUrl)
+    {
+        message.reply("Unable to find video specified");
+        return;
+    }
+
+    let dlResult;
     try
     {
-        audioFile = await yt.download(ytUrl, "audio-" + channel.id);
+        dlResult = await yt.download(ytUrl, "audio-" + channel.id);
     }
     catch (e)
     {
@@ -170,14 +231,13 @@ async function playCmd(message, args)
         return;
     }
 
-    if (!audioFile)
+    if (!dlResult || !dlResult.filename)
     {
         message.reply("Failed to obtain audio");
         return;
     }
 
-    audioFile = AUDIO_DIR + audioFile;
-    console.log("AUDIO: " + audioFile);
+    let audioFile = AUDIO_DIR + dlResult.filename;
 
     let voiceConnection = null;
     let ytPlayer = discordVoice.createAudioPlayer();
@@ -193,8 +253,16 @@ async function playCmd(message, args)
         console.error(error);
     }
 
+    message.reply("Now playing: '" + dlResult.title + "'");
+
     try
     {
+        addActivePlayer(channel.id, voiceConnection, ytPlayer);
+
+        ytPlayer.on(discordVoice.AudioPlayerStatus.Idle, () =>
+            {
+                stopPlayer(channel.id, false);
+            });
         await playSound(ytPlayer, audioFile);
     }
     catch(error)
@@ -204,7 +272,6 @@ async function playCmd(message, args)
         console.error("Failed to play audio"); 
         console.error(error);
     }
-    console.log("AUDIO GOOD");
 }
 
 async function playPokeCall(message, audioFile)
