@@ -249,6 +249,7 @@ async function callCmd(message, args)
             console.log("Pokemon missing cry data: " + pokemon);
             return;
         }
+        console.log(pokeData.cries.latest);
         audio.playPokeCall(message, pokeData.cries.latest);
     }
     catch (error)
