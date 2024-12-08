@@ -4,7 +4,7 @@ var fs = require('fs');
 const {google} = require('googleapis');
 
 const YT_URL = "https://www.youtube.com/watch?v=";
-const DL_PATH = "./audio/"
+const DL_PATH = __dirname + "/../audio/"
 
 const MAX_AUDIO_SIZE = (100 * 1024 * 1024); // 100 MB
 
