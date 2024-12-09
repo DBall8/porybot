@@ -6,6 +6,7 @@ const {google} = require('googleapis');
 const YT_URL = "https://www.youtube.com/watch?v=";
 const DL_PATH = __dirname + "/../audio/"
 
+const MAX_SEARCH_RES = 10;
 const MAX_AUDIO_SIZE = (100 * 1024 * 1024); // 100 MB
 
 var ytHelp =
@@ -85,13 +86,12 @@ async function download(url, filename)
 
 async function search(query)
 {
-
     try
     {
         let res = await youtube.search.list({
             part: 'id,snippet',
             type: 'video',
-            maxResults: 1,
+            maxResults: MAX_SEARCH_RES,
             q: query
         });
 
@@ -109,8 +109,17 @@ async function search(query)
             return;
         }
 
-        let url = YT_URL + res.data.items[0].id.videoId;
-        return url;
+        for (let i=0; i<MAX_SEARCH_RES; i++)
+        {
+            if (res.data.items[i].snippet.liveBroadcastContent == "live")
+            {
+                // Exclude livestreams
+                continue;
+            }
+            return YT_URL + res.data.items[i].id.videoId;
+        }
+
+        return null;
     } 
     catch(err)
     {

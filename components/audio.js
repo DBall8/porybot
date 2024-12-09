@@ -18,41 +18,56 @@ var minTime = DEFAULT_MIN_TIME;
 var maxTime = DEFAULT_MAX_TIME;
 
 var activeGnomeChannels = [];
-var activePlayers = {};
+var channelStates = {};
 
-function addActivePlayer(channelId, voiceConn, player)
+function addChannelState(channelId, voiceConn, player, title)
 {
-    activePlayers[channelId] = 
+    channelStates[channelId] = 
         {
             voice: voiceConn,
-            player: player
+            player: player,
+            title:  title
         };
 }
 
 function stopPlayer(channelId, shouldLeave)
 {
-    if (!(channelId in activePlayers))
+    if (!(channelId in channelStates))
     {
         return;
     }
 
-    if (!activePlayers[channelId])
+    if (!channelStates[channelId])
     {
-        delete activePlayers[channelId];
+        delete channelStates[channelId];
         return;
     }
 
-    if (activePlayers[channelId].player)
+    if (channelStates[channelId].player)
     {
-        activePlayers[channelId].player.stop();
+        channelStates[channelId].player.pause();
     }
 
-    if (shouldLeave && activePlayers[channelId].voice)
+    if (shouldLeave && channelStates[channelId].voice)
     {
-        activePlayers[channelId].voice.destroy();
-        delete activePlayers[channelId];
+        channelStates[channelId].player.stop();
+        channelStates[channelId].voice.destroy();
+        delete channelStates[channelId];
     }
 }
+
+
+function getChannelState(channelId)
+{
+    if (!(channelId in channelStates) ||
+        !channelStates[channelId])
+    {
+        return null;
+    }
+    
+    return channelStates[channelId];
+}
+
 
 function isGnomeActive(channelId)
 {
@@ -205,6 +220,27 @@ async function playCmd(message, args)
         return;
     }
 
+    if (args[1] != 'play')
+    {
+        message.reply("Invalid command!");
+        return;
+    }
+        
+    if (args.length == 2) // Not given anything to play, so attemtp to resume previous
+    {
+        let channelState = getChannelState(channel.id);
+        if (channelState && channelState.player)
+        {
+            channelState.player.unpause();
+            message.reply("Resuming: " + channelState.title);
+        }
+        else
+        {
+            message.reply("Nothing to play, please give a youtube link or search phrase");
+        }
+        return;
+    }
+
     let ytUrl = args[1];
 
     if (!ytUrl.includes("youtube.com"))
@@ -257,7 +293,7 @@ async function playCmd(message, args)
 
     try
     {
-        addActivePlayer(channel.id, voiceConnection, ytPlayer);
+        addChannelState(channel.id, voiceConnection, ytPlayer, dlResult.title);
 
         ytPlayer.on(discordVoice.AudioPlayerStatus.Idle, () =>
             {
