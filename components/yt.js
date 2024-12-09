@@ -18,6 +18,18 @@ const youtube = google.youtube({
     auth: auth.google_api_key
 });
 
+async function deleteExistingAudio(filename)
+{
+    let audioFiles = fs.readdirSync(DL_PATH);
+    await Promise.all(audioFiles.map(async (file) =>
+        {
+            if (file.substring(0, file.indexOf(".")) === filename)
+            {
+                await fs.unlinkSync(DL_PATH + file);
+            }
+        }));
+}
+
 async function download(url, filename)
 {
     let videoId;
@@ -68,6 +80,8 @@ async function download(url, filename)
     }
 
     let fullFileName = filename + "." + format.container;
+    deleteExistingAudio(filename); // Delete audio that shares this name
+
     let writeStream = fs.createWriteStream(DL_PATH + fullFileName);
     let dlStream = ytdl.downloadFromInfo(info, {format: format})
     

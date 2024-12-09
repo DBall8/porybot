@@ -1,5 +1,7 @@
 var discordVoice = require('@discordjs/voice');
 var yt = require('./yt.js');
+var ffmpeg = require('fluent-ffmpeg');
+var path = require('path');
 
 var gnomeHelp =
     "**!gnome** [leave]\n" +
@@ -68,6 +70,30 @@ function getChannelState(channelId)
     return channelStates[channelId];
 }
 
+function trimAudio(audioFilePath, startS)
+{
+    audioFilePath = path.resolve(audioFilePath);
+    let extensionIndex = audioFilePath.indexOf(".");
+    let newFilePath = audioFilePath.substring(0, extensionIndex) + "-cut" + audioFilePath.substring(extensionIndex);
+
+    return new Promise((res, rej) =>
+        {
+            ffmpeg({source: audioFilePath})
+                .setStartTime(startS)
+                .output(newFilePath)
+                .on('error', (error) =>
+                    {
+                        console.error("Trim error");
+                        console.error(error);
+                        rej(null);
+                    })
+                .on('end', () =>
+                    {
+                        res(newFilePath);
+                    })
+                .run();
+        });
+}
 
 function isGnomeActive(channelId)
 {
@@ -200,7 +226,6 @@ async function playCmd(message, args)
         return;
     }
 
-
     let channel = message.member?.voice.channel;
     if (!channel)
     {
@@ -220,13 +245,13 @@ async function playCmd(message, args)
         return;
     }
 
-    if (args[1] != 'play')
+    if ((args[1] != 'play') && (args[1] != 'playfrom'))
     {
         message.reply("Invalid command!");
         return;
     }
         
-    if (args.length == 2) // Not given anything to play, so attemtp to resume previous
+    if ((args[1] === 'play') && (args.length == 2)) // Not given anything to play, so attemtp to resume previous
     {
         let channelState = getChannelState(channel.id);
         if (channelState && channelState.player)
@@ -241,12 +266,23 @@ async function playCmd(message, args)
         return;
     }
 
-    let ytUrl = args[1];
+
+    let ytUrl = args[2];
+    let startTime = 0;
+    let queryIndex = args[0].length + 1 + args[1].length + 1;
+
+    if (args[1] === 'playfrom')
+    {
+        // Factor in the additional time argument
+        startTime = parseInt(args[2], 10);
+        ytUrl = args[3];
+        queryIndex += args[2].length + 1; 
+    }
 
     if (!ytUrl.includes("youtube.com"))
     {
         // Not given a url, search this term instead
-        let query = message.content.slice(args[0].length + 1);
+        let query = message.content.slice(queryIndex);
         ytUrl = await yt.search(query);
     }
 
@@ -274,6 +310,12 @@ async function playCmd(message, args)
     }
 
     let audioFile = AUDIO_DIR + dlResult.filename;
+    
+    if (startTime != 0)
+    {
+        // trim video start time
+        audioFile = await trimAudio(audioFile, startTime * 60);
+    }
 
     let voiceConnection = null;
     let ytPlayer = discordVoice.createAudioPlayer();
@@ -297,7 +339,12 @@ async function playCmd(message, args)
 
         ytPlayer.on(discordVoice.AudioPlayerStatus.Idle, () =>
             {
-                stopPlayer(channel.id, false);
+                let channelState = getChannelState(channel.id);
+                if (channelState)
+                {
+                    channelState.player.stop();
+                    channelState.title = "";
+                }
             });
         await playSound(ytPlayer, audioFile);
     }
