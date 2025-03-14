@@ -2,6 +2,7 @@ var discordVoice = require('@discordjs/voice');
 var yt = require('./yt.js');
 var ffmpeg = require('fluent-ffmpeg');
 var path = require('path');
+var fs = require('fs');
 
 var gnomeHelp =
     "**!gnome** [leave]\n" +
@@ -19,16 +20,37 @@ var gnomeTimer = null;
 var minTime = DEFAULT_MIN_TIME;
 var maxTime = DEFAULT_MAX_TIME;
 
+var ALONE_CHECK_INTERVAL_MS = 5000;
+
 var activeGnomeChannels = [];
 var channelStates = {};
 
+function checkAlone(channelId)
+{
+    if (!channelStates[channelId] || !channelStates[channelId].voice)
+    {
+        return;
+    }
+//    console.log(channelStates[channelId].voice);
+    console.log(channelStates[channelId].voice.members);
+}
+
 function addChannelState(channelId, voiceConn, player, title)
 {
+
+    voiceConn.on(discordVoice.VoiceConnectionStatus.Disconnected, (oldState, newState) =>
+        {
+            stopPlayer(channelId, true);
+        });
+
+    aloneTimer = setInterval(() => checkAlone(channelId), ALONE_CHECK_INTERVAL_MS);
+
     channelStates[channelId] = 
         {
             voice: voiceConn,
             player: player,
-            title:  title
+            title:  title,
+            aloneTimer: aloneTimer 
         };
 }
 
@@ -54,6 +76,8 @@ function stopPlayer(channelId, shouldLeave)
     {
         channelStates[channelId].player.stop();
         channelStates[channelId].voice.destroy();
+        channelStates[channelId].title = "";
+        clearTimeout(channelStates[channelId].aloneTimer);
         delete channelStates[channelId];
     }
 }
@@ -70,29 +94,36 @@ function getChannelState(channelId)
     return channelStates[channelId];
 }
 
-function trimAudio(audioFilePath, startS)
+async function trimAudio(audioFilePath, startS)
 {
     audioFilePath = path.resolve(audioFilePath);
     let extensionIndex = audioFilePath.indexOf(".");
     let newFilePath = audioFilePath.substring(0, extensionIndex) + "-cut" + audioFilePath.substring(extensionIndex);
 
-    return new Promise((res, rej) =>
-        {
-            ffmpeg({source: audioFilePath})
-                .setStartTime(startS)
-                .output(newFilePath)
-                .on('error', (error) =>
-                    {
-                        console.error("Trim error");
-                        console.error(error);
-                        rej(null);
-                    })
-                .on('end', () =>
-                    {
-                        res(newFilePath);
-                    })
-                .run();
-        });
+    try
+    {
+        await new Promise((res, rej) =>
+            {
+                ffmpeg({source: audioFilePath})
+                    .setStartTime(startS)
+                    .output(newFilePath)
+                    .on('error', (error) =>
+                        {
+                            console.error("Trim error");
+                            console.error(error);
+                            rej(null);
+                        })
+                    .on('end', () =>
+                        {
+                            res();
+                        })
+                    .run();
+            });
+
+        // Move new cut file back to the original location
+        fs.renameSync(newFilePath, audioFilePath);
+    }
+    catch (e) { return; }
 }
 
 function isGnomeActive(channelId)
@@ -139,7 +170,7 @@ function playSound(player, soundFile)
 
     player.play(resource);
 
-    return discordVoice.entersState(player, discordVoice.AudioPlayerStatus.Playing, 5000);
+    return discordVoice.entersState(player, discordVoice.AudioPlayerStatus.Playing, 30000);
 }
 
 async function joinChannel(channel)
@@ -215,8 +246,12 @@ async function gnomeCommand(message, args)
 
 
 var playHelp =
-    "**!play** <yt_url | search_term | 'stop' | 'leave'>\n" +
-    "--- Plays the audio from the given youtube url. Use 'stop' or 'leave' to stop playing\n" 
+    "**!music** <option>\n" +
+    "--- Plays the audio from the given youtube url. Options are:\n" +
+    "    play [youtube_link | search_phrase] - starts playing music from a link or search term\n" +
+    "    playfrom <start_time_minutes> <youtube_link | search_phrase> - Plays starting from given minute mark\n" +
+    "    stop - Stops current music. Enter '!music play' to resume\n" +
+    "    leave - Stop music and makes the bot leave the voice channel\n";
 
 async function playCmd(message, args)
 {
@@ -266,7 +301,6 @@ async function playCmd(message, args)
         return;
     }
 
-
     let ytUrl = args[2];
     let startTime = 0;
     let queryIndex = args[0].length + 1 + args[1].length + 1;
@@ -274,7 +308,20 @@ async function playCmd(message, args)
     if (args[1] === 'playfrom')
     {
         // Factor in the additional time argument
-        startTime = parseInt(args[2], 10);
+        let timeComponents = args[2].split(':');
+        if (timeComponents.length != 2)
+        {
+            message.reply("Please give a time in the format minutes:seconds");
+            return;
+        }
+
+        startTime = (parseInt(timeComponents[0], 10) * 60) + parseInt(timeComponents[1], 10);
+        if (isNaN(startTime))
+        {
+            message.reply("Please give a time in the format minutes:seconds");
+            return;
+        }
+
         ytUrl = args[3];
         queryIndex += args[2].length + 1; 
     }
@@ -292,6 +339,13 @@ async function playCmd(message, args)
         return;
     }
 
+    let channelState = getChannelState(channel.id);
+    if (channelState && channelState.player)
+    {
+        // Stop audio to avoid hearing a hiccup while the new file downloads
+        channelState.player.stop();
+    }
+
     let dlResult;
     try
     {
@@ -299,7 +353,7 @@ async function playCmd(message, args)
     }
     catch (e)
     {
-        message.reply("Failed to obtain video");
+        message.reply("Failed to obtain video: " + e);
         return;
     }
 
@@ -314,38 +368,71 @@ async function playCmd(message, args)
     if (startTime != 0)
     {
         // trim video start time
-        audioFile = await trimAudio(audioFile, startTime * 60);
+        await trimAudio(audioFile, startTime);
     }
 
     let voiceConnection = null;
-    let ytPlayer = discordVoice.createAudioPlayer();
-    try
+    let ytPlayer = null;
+
+    if (channelState && channelState.player)
     {
-        voiceConnection = await joinChannel(channel);
-        voiceConnection.subscribe(ytPlayer);
+        ytPlayer = channelState.player;
     }
-    catch (error)
+    else
     {
-        message.reply("Encountered an error...");
-        console.error("Failed to subscribe call player");
-        console.error(error);
-    }
-
-    message.reply("Now playing: '" + dlResult.title + "'");
-
-    try
-    {
-        addChannelState(channel.id, voiceConnection, ytPlayer, dlResult.title);
-
-        ytPlayer.on(discordVoice.AudioPlayerStatus.Idle, () =>
+        ytPlayer = discordVoice.createAudioPlayer();
+        ytPlayer.on('error', (error) =>
             {
-                let channelState = getChannelState(channel.id);
-                if (channelState)
-                {
-                    channelState.player.stop();
-                    channelState.title = "";
-                }
+                console.error("Player error:");
+                console.error(error);
             });
+
+        ytPlayer.on('stateChange', (oldState, newState) =>
+            {
+                console.log("STATE " + oldState.status + " => " + newState.status);
+            });
+    }
+
+    if (channelState && channelState.voice)
+    {
+        voiceConnection = channelState.voice;
+    }
+    else
+    {
+        try
+        {
+            voiceConnection = await joinChannel(channel);
+            voiceConnection.subscribe(ytPlayer);
+        }
+        catch (error)
+        {
+            message.reply("Encountered an error...");
+            console.error("Failed to subscribe call player");
+            console.error(error);
+            return;
+        }
+    }
+
+    if (channelState)
+    {
+        channelState.title = dlResult.title;
+    }
+
+    let nowPlayingReply = "Now playing: '" + dlResult.title + "'";
+    if (startTime > 0)
+    {
+        nowPlayingReply += " starting from " + Math.floor(startTime / 60) + ":";
+        if ((startTime % 60) < 10) nowPlayingReply += "0";
+        nowPlayingReply += startTime % 60;
+    }
+    message.reply(nowPlayingReply);
+
+    try
+    {
+        if (!channelState)
+        {
+            addChannelState(channel.id, voiceConnection, ytPlayer, dlResult.title);
+        }
         await playSound(ytPlayer, audioFile);
     }
     catch(error)

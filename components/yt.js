@@ -43,6 +43,7 @@ async function download(url, filename)
     {
         console.error("YTDL: Failed to get video ID");
         console.error(e);
+        throw "Video not found";
         return;
     }
 
@@ -54,6 +55,7 @@ async function download(url, filename)
     {
         console.error("YTDL: Failed to get video metadata");
         console.error(e);
+        throw "Error retrieving video";
         return;
     }
 
@@ -63,6 +65,7 @@ async function download(url, filename)
     if (!audioFormats)
     {
         console.error("YTDL: Failed to get audio formats");
+        throw "Valid download format not found";
         return;
     }
 
@@ -70,12 +73,14 @@ async function download(url, filename)
     if (!format)
     {
         console.error("YTDL: Failed to select audio format");
+        throw "Valid download format not found"
         return;
     }
 
     if (format.contentLength > MAX_AUDIO_SIZE)
     {
         console.error("YTDL: Requested audio is too large");
+        throw "Requested audio is too large";
         return;
     }
 
@@ -85,17 +90,24 @@ async function download(url, filename)
     let writeStream = fs.createWriteStream(DL_PATH + fullFileName);
     let dlStream = ytdl.downloadFromInfo(info, {format: format})
     
-    dlStream.on("error", (error) => 
+    return new Promise((resolve, reject) =>
         {
-            console.error("YTDL: Failed download.");
-            console.error(error);
-        });
-    await dlStream.pipe(writeStream);
+            dlStream.on("error", (error) => 
+            {
+                console.error("YTDL: Failed download.");
+                console.error(error);
+                reject("Download failed");
+            });
 
-    return {
-        filename: fullFileName,
-        title: title
-    };
+            let pipeStream = dlStream.pipe(writeStream);
+            pipeStream.on("finish", () =>
+                {
+                    resolve({
+                        filename: fullFileName,
+                        title: title
+                    });
+                });
+        });
 }
 
 async function search(query)

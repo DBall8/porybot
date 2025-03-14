@@ -87,7 +87,7 @@ function collectValidNames(nextUrl)
         {
             if (response.statusCode != 200)
             {
-                console.log
+                console.error("Failed to collect poke batch\n");
                 return;
             }
 
