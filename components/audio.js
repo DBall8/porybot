@@ -20,78 +20,124 @@ var gnomeTimer = null;
 var minTime = DEFAULT_MIN_TIME;
 var maxTime = DEFAULT_MAX_TIME;
 
-var ALONE_CHECK_INTERVAL_MS = 5000;
+var ALONE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
-var activeGnomeChannels = [];
-var channelStates = {};
+var savedVoiceConns = {};
 
-function checkAlone(channelId)
+function getSavedConnection(channelId)
 {
-    if (!channelStates[channelId] || !channelStates[channelId].voice)
-    {
-        return;
-    }
-//    console.log(channelStates[channelId].voice);
-    console.log(channelStates[channelId].voice.members);
-}
-
-function addChannelState(channelId, voiceConn, player, title)
-{
-
-    voiceConn.on(discordVoice.VoiceConnectionStatus.Disconnected, (oldState, newState) =>
-        {
-            stopPlayer(channelId, true);
-        });
-
-    aloneTimer = setInterval(() => checkAlone(channelId), ALONE_CHECK_INTERVAL_MS);
-
-    channelStates[channelId] = 
-        {
-            voice: voiceConn,
-            player: player,
-            title:  title,
-            aloneTimer: aloneTimer 
-        };
-}
-
-function stopPlayer(channelId, shouldLeave)
-{
-    if (!(channelId in channelStates))
-    {
-        return;
-    }
-
-    if (!channelStates[channelId])
-    {
-        delete channelStates[channelId];
-        return;
-    }
-
-    if (channelStates[channelId].player)
-    {
-        channelStates[channelId].player.pause();
-    }
-
-    if (shouldLeave && channelStates[channelId].voice)
-    {
-        channelStates[channelId].player.stop();
-        channelStates[channelId].voice.destroy();
-        channelStates[channelId].title = "";
-        clearTimeout(channelStates[channelId].aloneTimer);
-        delete channelStates[channelId];
-    }
-}
-
-
-function getChannelState(channelId)
-{
-    if (!(channelId in channelStates) ||
-        !channelStates[channelId])
+    if (!(channelId in savedVoiceConns) ||
+        !savedVoiceConns[channelId])
     {
         return null;
     }
     
-    return channelStates[channelId];
+    return savedVoiceConns[channelId];
+}
+
+function stopPlayer(channelId)
+{
+    let savedConn = getSavedConnection(channelId);
+    if (!savedConn) return;
+    if (!savedConn.player) return;
+
+    savedConn.player.pause();
+}
+
+function leaveChannel(channelId)
+{
+    let savedConn = getSavedConnection(channelId);
+    if (!savedConn) return;
+
+    if (savedConn.player)
+    {
+        savedConn.player.stop();
+    }
+
+    if (savedConn.voice)
+    {
+        savedConn.voice.destroy();
+    }
+
+    if (savedConn.aloneTimer)
+    {
+        clearTimeout(savedVoiceConns[channelId].aloneTimer);
+    }
+
+    delete savedVoiceConns[channelId];
+}
+
+async function joinChannel(channel)
+{
+    let existingConn = getSavedConnection(channel.id);
+    if (existingConn)
+    {
+        return existingConn;
+    }
+
+    let voiceConnection = discordVoice.joinVoiceChannel({
+        channelId: channel.id,
+        guildId: channel.guild.id,
+        adapterCreator: channel.guild.voiceAdapterCreator
+    });
+
+    try
+    {
+        await discordVoice.entersState(voiceConnection, discordVoice.VoiceConnectionStatus.Ready, 30000);
+    }
+    catch (error)
+    {
+        connection.destroy();
+        throw error;
+        return;
+    }
+
+    let newVoiceConn = {};
+    newVoiceConn.voice = voiceConnection;
+
+    voiceConnection.on(discordVoice.VoiceConnectionStatus.Disconnected, (oldState, newState) =>
+        {
+            stopPlayer(channel.id, true);
+        });
+
+
+    newVoiceConn.player = discordVoice.createAudioPlayer();
+    newVoiceConn.player.on('error', (error) =>
+        {
+            console.error("Player error:");
+            console.error(error);
+        });
+
+//    newVoiceConn.player.on('stateChange', (oldState, newState) =>
+//        {
+//            console.log("STATE " + oldState.status + " => " + newState.status);
+//        });
+
+    voiceConnection.subscribe(newVoiceConn.player);
+
+    newVoiceConn.aloneTimer = setInterval(() =>
+        {
+            if (channel.members.size <= 1) leaveChannel(channel.id);
+        },
+        ALONE_CHECK_INTERVAL_MS);
+
+    savedVoiceConns[channel.id] = newVoiceConn;
+
+    return newVoiceConn;
+}
+
+function playSound(player, soundFile)
+{
+    const resource = discordVoice.createAudioResource(
+        soundFile,
+        {
+            inputType: discordVoice.StreamType.Arbitrary
+        });
+
+    if(!player) console.log("PLAYER DEAD");
+    player.play(resource);
+
+    return discordVoice.entersState(player, discordVoice.AudioPlayerStatus.Playing, 30000);
 }
 
 async function trimAudio(audioFilePath, startS)
@@ -139,16 +185,19 @@ function isGnomeActive(channelId)
     return false;
 }
 
-async function gnomeLoop()
+async function gnomeLoop(channelId)
 {
-    if (gnomeTimer)
+    let conn = getSavedConnection(channelId);
+    if (!conn) return;
+
+    if (conn.gnomeTimer)
     {
-        clearTimeout(gnomeTimer);
+        clearTimeout(conn.gnomeTimer);
     }
 
     try
     {
-        await playSound(gnomePlayer, GNOME_WAV);
+        await playSound(conn.player, GNOME_WAV);
     }
     catch(error)
     {
@@ -157,41 +206,11 @@ async function gnomeLoop()
     }
 
     let delay = (Math.random() * (maxTime - minTime)) + minTime;
-    gnomeTimer = setTimeout(gnomeLoop, delay);
+    conn.gnomeTimer = setTimeout(
+        () => {gnomeLoop(channelId)},
+        delay);
 }
 
-function playSound(player, soundFile)
-{
-    const resource = discordVoice.createAudioResource(
-        soundFile,
-        {
-            inputType: discordVoice.StreamType.Arbitrary
-        });
-
-    player.play(resource);
-
-    return discordVoice.entersState(player, discordVoice.AudioPlayerStatus.Playing, 30000);
-}
-
-async function joinChannel(channel)
-{
-    let connection = discordVoice.joinVoiceChannel({
-        channelId: channel.id,
-        guildId: channel.guild.id,
-        adapterCreator: channel.guild.voiceAdapterCreator
-    });
-
-    try
-    {
-        await discordVoice.entersState(connection, discordVoice.VoiceConnectionStatus.Ready, 30000);
-        return connection;
-    }
-    catch (error)
-    {
-        connection.destroy();
-        throw error;
-    }
-}
 
 async function gnomeCommand(message, args)
 {
@@ -204,12 +223,7 @@ async function gnomeCommand(message, args)
 
     if (args[1] === "leave")
     {
-        let voiceConnection = discordVoice.getVoiceConnection(message.guild.id);
-        if (voiceConnection)
-        {
-            voiceConnection.destroy();
-        }
-        activeGnomeChannels = activeGnomeChannels.filter((id) => { return id != channel.id; });
+        leaveChannel(channel.id);
         return;
     }
 
@@ -228,20 +242,20 @@ async function gnomeCommand(message, args)
         }
     } 
 
+    let connection;
     try
     {
-        voiceConnection = await joinChannel(channel);
-        voiceConnection.subscribe(gnomePlayer);
+        connection = await joinChannel(channel);
     }
     catch (error)
     {
         message.reply("Encountered an error, sorry");
         console.error("Failed to join voice channel:");
         console.error(error);
+        return;
     }
 
-    activeGnomeChannels.push(channel.id);
-    gnomeLoop(message.guild.id);
+    gnomeLoop(channel.id);
 }
 
 
@@ -270,13 +284,13 @@ async function playCmd(message, args)
 
     if (args[1] === 'stop')
     {
-        stopPlayer(channel.id, false);
+        stopPlayer(channel.id);
         return;
     }
 
     if (args[1] === 'leave')
     {
-        stopPlayer(channel.id, true);
+        leaveChannel(channel.id);
         return;
     }
 
@@ -288,11 +302,11 @@ async function playCmd(message, args)
         
     if ((args[1] === 'play') && (args.length == 2)) // Not given anything to play, so attemtp to resume previous
     {
-        let channelState = getChannelState(channel.id);
-        if (channelState && channelState.player)
+        let connection = getSavedConnection(channel.id);
+        if (connection && connection.player)
         {
-            channelState.player.unpause();
-            message.reply("Resuming: " + channelState.title);
+            connection.player.unpause();
+            message.reply("Resuming: " + connection.title);
         }
         else
         {
@@ -339,12 +353,8 @@ async function playCmd(message, args)
         return;
     }
 
-    let channelState = getChannelState(channel.id);
-    if (channelState && channelState.player)
-    {
-        // Stop audio to avoid hearing a hiccup while the new file downloads
-        channelState.player.stop();
-    }
+    // Stop audio to avoid hearing a hiccup while the new file downloads
+    stopPlayer(channel.id);
 
     let dlResult;
     try
@@ -371,38 +381,12 @@ async function playCmd(message, args)
         await trimAudio(audioFile, startTime);
     }
 
-    let voiceConnection = null;
-    let ytPlayer = null;
-
-    if (channelState && channelState.player)
-    {
-        ytPlayer = channelState.player;
-    }
-    else
-    {
-        ytPlayer = discordVoice.createAudioPlayer();
-        ytPlayer.on('error', (error) =>
-            {
-                console.error("Player error:");
-                console.error(error);
-            });
-
-        ytPlayer.on('stateChange', (oldState, newState) =>
-            {
-                console.log("STATE " + oldState.status + " => " + newState.status);
-            });
-    }
-
-    if (channelState && channelState.voice)
-    {
-        voiceConnection = channelState.voice;
-    }
-    else
+    let connection = getSavedConnection(channel.id);
+    if (!connection)
     {
         try
         {
-            voiceConnection = await joinChannel(channel);
-            voiceConnection.subscribe(ytPlayer);
+            connection = await joinChannel(channel);
         }
         catch (error)
         {
@@ -413,9 +397,9 @@ async function playCmd(message, args)
         }
     }
 
-    if (channelState)
+    if (connection)
     {
-        channelState.title = dlResult.title;
+        connection.title = dlResult.title;
     }
 
     let nowPlayingReply = "Now playing: '" + dlResult.title + "'";
@@ -429,11 +413,7 @@ async function playCmd(message, args)
 
     try
     {
-        if (!channelState)
-        {
-            addChannelState(channel.id, voiceConnection, ytPlayer, dlResult.title);
-        }
-        await playSound(ytPlayer, audioFile);
+        await playSound(connection.player, audioFile);
     }
     catch(error)
     {

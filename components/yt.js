@@ -7,7 +7,7 @@ const YT_URL = "https://www.youtube.com/watch?v=";
 const DL_PATH = __dirname + "/../audio/"
 
 const MAX_SEARCH_RES = 10;
-const MAX_AUDIO_SIZE = (100 * 1024 * 1024); // 100 MB
+const MAX_AUDIO_SIZE = (500 * 1024 * 1024); // 100 MB
 
 var ytHelp =
     "**!yt** <search>\n" +
@@ -99,6 +99,12 @@ async function download(url, filename)
                 reject("Download failed");
             });
 
+            dlStream.on("progress", (size, num, total) => 
+                {
+                    console.log("Size: " + size);
+                    console.log("Num: " + num);
+                    console.log("Total: " + total);
+                });
             let pipeStream = dlStream.pipe(writeStream);
             pipeStream.on("finish", () =>
                 {
