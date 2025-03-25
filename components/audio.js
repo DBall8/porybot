@@ -3,6 +3,7 @@ var yt = require('./yt.js');
 var ffmpeg = require('fluent-ffmpeg');
 var path = require('path');
 var fs = require('fs');
+var playdl = require('play-dl');
 
 var gnomeHelp =
     "**!gnome** [leave]\n" +
@@ -101,17 +102,22 @@ async function joinChannel(channel)
         });
 
 
-    newVoiceConn.player = discordVoice.createAudioPlayer();
+    newVoiceConn.player = discordVoice.createAudioPlayer({
+        behaviors:
+        {
+           noSubscriber: discordVoice.NoSubscriberBehavior.Play
+        }
+    });
     newVoiceConn.player.on('error', (error) =>
         {
             console.error("Player error:");
             console.error(error);
         });
 
-//    newVoiceConn.player.on('stateChange', (oldState, newState) =>
-//        {
-//            console.log("STATE " + oldState.status + " => " + newState.status);
-//        });
+    newVoiceConn.player.on('stateChange', (oldState, newState) =>
+        {
+            console.log("STATE " + oldState.status + " => " + newState.status);
+        });
 
     voiceConnection.subscribe(newVoiceConn.player);
 
@@ -132,6 +138,21 @@ function playSound(player, soundFile)
         soundFile,
         {
             inputType: discordVoice.StreamType.Arbitrary
+        });
+
+    if(!player) console.log("PLAYER DEAD");
+    player.play(resource);
+
+    return discordVoice.entersState(player, discordVoice.AudioPlayerStatus.Playing, 30000);
+}
+
+function playSoundTest(player, stream)
+{
+    console.log(stream.stream)
+    const resource = discordVoice.createAudioResource(
+        stream.stream,
+        {
+            inputType: stream.type 
         });
 
     if(!player) console.log("PLAYER DEAD");
@@ -340,11 +361,19 @@ async function playCmd(message, args)
         queryIndex += args[2].length + 1; 
     }
 
+    let stream;
     if (!ytUrl.includes("youtube.com"))
     {
         // Not given a url, search this term instead
         let query = message.content.slice(queryIndex);
-        ytUrl = await yt.search(query);
+//        ytUrl = await yt.search(query);
+        let yt_info = await playdl.search(query, {limit: 1});
+        console.log(yt_info[0].url);
+        stream = await playdl.stream(yt_info[0].url);
+    }
+    else
+    {
+        stream = await playdl.stream(ytUrl);
     }
 
     if (!ytUrl)
@@ -356,30 +385,30 @@ async function playCmd(message, args)
     // Stop audio to avoid hearing a hiccup while the new file downloads
     stopPlayer(channel.id);
 
-    let dlResult;
-    try
-    {
-        dlResult = await yt.download(ytUrl, "audio-" + channel.id);
-    }
-    catch (e)
-    {
-        message.reply("Failed to obtain video: " + e);
-        return;
-    }
-
-    if (!dlResult || !dlResult.filename)
-    {
-        message.reply("Failed to obtain audio");
-        return;
-    }
-
-    let audioFile = AUDIO_DIR + dlResult.filename;
-    
-    if (startTime != 0)
-    {
-        // trim video start time
-        await trimAudio(audioFile, startTime);
-    }
+//    let dlResult;
+//    try
+//    {
+//        dlResult = await yt.download(ytUrl, "audio-" + channel.id);
+//    }
+//    catch (e)
+//    {
+//        message.reply("Failed to obtain video: " + e);
+//        return;
+//    }
+//
+//    if (!dlResult || !dlResult.filename)
+//    {
+//        message.reply("Failed to obtain audio");
+//        return;
+//    }
+//
+//    let audioFile = AUDIO_DIR + dlResult.filename;
+//    
+//    if (startTime != 0)
+//    {
+//        // trim video start time
+//        await trimAudio(audioFile, startTime);
+//    }
 
     let connection = getSavedConnection(channel.id);
     if (!connection)
@@ -397,31 +426,42 @@ async function playCmd(message, args)
         }
     }
 
-    if (connection)
-    {
-        connection.title = dlResult.title;
-    }
-
-    let nowPlayingReply = "Now playing: '" + dlResult.title + "'";
-    if (startTime > 0)
-    {
-        nowPlayingReply += " starting from " + Math.floor(startTime / 60) + ":";
-        if ((startTime % 60) < 10) nowPlayingReply += "0";
-        nowPlayingReply += startTime % 60;
-    }
-    message.reply(nowPlayingReply);
-
-    try
-    {
-        await playSound(connection.player, audioFile);
+    try{
+        await playSoundTest(connection.player, stream);
     }
     catch(error)
     {
         
-        message.reply("Encountered an error...");
-        console.error("Failed to play audio"); 
+        message.reply("encountered an error...");
+        console.error("failed to play audio"); 
         console.error(error);
     }
+//    if (connection)
+//    {
+//        connection.title = dlResult.title;
+//    }
+//
+//    let nowPlayingReply = "Now playing: '" + dlResult.title + "'";
+//    if (startTime > 0)
+//    {
+//        nowPlayingReply += " starting from " + Math.floor(startTime / 60) + ":";
+//        if ((startTime % 60) < 10) nowPlayingReply += "0";
+//        nowPlayingReply += startTime % 60;
+//    }
+//    message.reply(nowPlayingReply);
+//
+//    try
+//    {
+//        await playSound(connection.player, audioFile);
+//    }
+//    catch(error)
+//    {
+//        
+//        message.reply("encountered an error...");
+//        console.error("failed to play audio"); 
+//        console.error(error);
+//    }
+
 }
 
 async function playPokeCall(message, audioFile)

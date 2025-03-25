@@ -87,6 +87,13 @@ async function download(url, filename)
     let fullFileName = filename + "." + format.container;
     deleteExistingAudio(filename); // Delete audio that shares this name
 
+    return new Promise((resolve, reject) =>
+        {
+            result = {info: info, format: format};
+            resolve(result);
+        });
+
+    /*
     let writeStream = fs.createWriteStream(DL_PATH + fullFileName);
     let dlStream = ytdl.downloadFromInfo(info, {format: format})
     
@@ -114,6 +121,8 @@ async function download(url, filename)
                     });
                 });
         });
+
+    */
 }
 
 async function search(query)
