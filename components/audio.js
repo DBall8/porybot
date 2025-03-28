@@ -123,7 +123,7 @@ async function joinChannel(channel)
 
     savedVoiceConns[channel.id] = newVoiceConn;
 
-    return newVoiceConn;
+    return savedVoiceConns[channel.id];
 }
 
 function playSound(player, soundFile)
@@ -434,43 +434,37 @@ async function playPokeCall(message, audioFile)
         return;
     }
 
-    let voiceConnection = null;
-    let callPlayer = discordVoice.createAudioPlayer();
+    let connection = null;
     try
     {
-        voiceConnection = await joinChannel(channel);
-        voiceConnection.subscribe(callPlayer);
+        connection = await joinChannel(channel);
     }
-    catch (err)
+    catch (error)
     {
         message.reply("Encountered an error...");
-        console.error("Failed to subscribe call player");
+        console.error("Failed to join voice channel");
         console.error(error);
+        return;
+    }
+
+    if (!connection)
+    {
+        message.reply("Something went wrong, try again later...");
+        return;
     }
 
     try
     {
-        callPlayer.on(discordVoice.AudioPlayerStatus.Idle, () =>
-            {
-                callPlayer.stop();
-                if (!isGnomeActive(channel.id))
-                {
-                    voiceConnection.destroy();
-                } 
-
-            });
-        await playSound(callPlayer, audioFile);
+        await playSound(connection.player, audioFile);
     }
     catch(error)
     {
         
         message.reply("Encountered an error...");
-        console.error("Failed to play poke call"); 
+        console.error("Failed to play audio"); 
         console.error(error);
     }
 }
-
-
 
 exports.gnome =
 {
