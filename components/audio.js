@@ -3,6 +3,7 @@ var yt = require('./yt.js');
 var ffmpeg = require('fluent-ffmpeg');
 var path = require('path');
 var fs = require('fs');
+var playdl = require('play-dl');
 
 var gnomeHelp =
     "**!gnome** [leave]\n" +
@@ -24,6 +25,13 @@ var ALONE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 var savedVoiceConns = {};
 
+playdl.getFreeClientID().then((clientID) => {
+    playdl.setToken({
+      soundcloud : {client_id : clientID}
+    });
+    console.log("Soundcloud ready");
+})
+
 function getSavedConnection(channelId)
 {
     if (!(channelId in savedVoiceConns) ||
@@ -35,11 +43,20 @@ function getSavedConnection(channelId)
     return savedVoiceConns[channelId];
 }
 
-function stopPlayer(channelId)
+function stopPlayer(channelId, message)
 {
     let savedConn = getSavedConnection(channelId);
     if (!savedConn) return;
     if (!savedConn.player) return;
+
+    if (savedConn.currentAudio && message)
+    {
+        let timeFull = savedConn.currentAudio.playbackDuration / 1000;
+        let timeMinutes = Math.floor(timeFull / 60);
+        let timeSeconds = Math.floor(timeFull - (timeMinutes * 60));
+        if (timeSeconds < 10) timeSeconds = "0" + timeSeconds;
+        message.reply("Stopped at " + timeMinutes + ":" + timeSeconds);
+    }
 
     savedConn.player.pause();
 }
@@ -97,7 +114,7 @@ async function joinChannel(channel)
 
     voiceConnection.on(discordVoice.VoiceConnectionStatus.Disconnected, (oldState, newState) =>
         {
-            stopPlayer(channel.id, true);
+            stopPlayer(channel.id);
         });
 
 
@@ -126,18 +143,68 @@ async function joinChannel(channel)
     return savedVoiceConns[channel.id];
 }
 
-function playSound(player, soundFile)
+async function playSound(channelId, soundFile)
 {
+    let wasAudioPaused = false;
+    let conn = getSavedConnection(channelId);
+    if (!conn)
+    {
+        console.error("Could not play audio, channel does not exist");
+        return;
+    }
+
     const resource = discordVoice.createAudioResource(
         soundFile,
         {
             inputType: discordVoice.StreamType.Arbitrary
         });
 
-    if(!player) console.log("PLAYER DEAD");
-    player.play(resource);
+    if (conn.player && conn.player.state.status === 'playing')
+    {
+        conn.player.pause()
+        wasAudioPaused = true;
+    }
 
-    return discordVoice.entersState(player, discordVoice.AudioPlayerStatus.Playing, 30000);
+    let tempPlayer = discordVoice.createAudioPlayer();
+    conn.voice.subscribe(tempPlayer);
+    tempPlayer.play(resource);
+
+    try
+    {
+        await discordVoice.entersState(tempPlayer, discordVoice.AudioPlayerStatus.Playing, 30000);
+        await discordVoice.entersState(tempPlayer, discordVoice.AudioPlayerStatus.Idle, 30000);
+    }
+    catch (error)
+    {
+        console.error("Short audio error:");
+        console.error(error);
+    }
+
+    if (conn.player)
+    {
+        conn.voice.subscribe(conn.player);
+        if (wasAudioPaused) conn.player.unpause();
+    }
+
+    tempPlayer.stop();
+}
+
+function playGnomeSound(connection)
+{
+}
+
+function playStream(connection, stream)
+{
+    const resource = discordVoice.createAudioResource(
+        stream.stream,
+        {
+            inputType: stream.type 
+        });
+
+    connection.currentAudio = resource;
+    connection.player.play(resource);
+
+    return discordVoice.entersState(connection.player, discordVoice.AudioPlayerStatus.Playing, 30000);
 }
 
 async function trimAudio(audioFilePath, startS)
@@ -172,6 +239,19 @@ async function trimAudio(audioFilePath, startS)
     catch (e) { return; }
 }
 
+function timeStrToMs(timeStr)
+{
+    let timeComponents = timeStr.split(':');
+    if (timeComponents.length != 2)
+    {
+        return NaN;
+    }
+
+    let timeMs = (parseInt(timeComponents[0], 10) * 60) + parseInt(timeComponents[1], 10);
+    timeMs *= 1000;
+    return timeMs;
+}
+
 function isGnomeActive(channelId)
 {
     for (let i=0; i<activeGnomeChannels.length; i++)
@@ -195,15 +275,7 @@ async function gnomeLoop(channelId)
         clearTimeout(conn.gnomeTimer);
     }
 
-    try
-    {
-        await playSound(conn.player, GNOME_WAV);
-    }
-    catch(error)
-    {
-        console.error("Failed to play audio:");
-        console.error(error);
-    }
+    playSound(channelId, GNOME_WAV);
 
     let delay = (Math.random() * (maxTime - minTime)) + minTime;
     conn.gnomeTimer = setTimeout(
@@ -259,16 +331,186 @@ async function gnomeCommand(message, args)
 }
 
 
+//var playHelp =
+//    "**!music** <option>\n" +
+//    "--- Plays the audio from the given youtube url. Options are:\n" +
+//    "    play [youtube_link | search_phrase] - starts playing music from a link or search term\n" +
+//    "    playfrom <start_time_minutes> <youtube_link | search_phrase> - Plays starting from given minute mark\n" +
+//    "    stop - Stops current music. Enter '!music play' to resume\n" +
+//    "    leave - Stop music and makes the bot leave the voice channel\n";
+//
+//async function playCmd(message, args)
+//{
+//    if (args.length < 2)
+//    {
+//        message.reply("Please include a youtube linke, or 'stop' or 'leave' to stop playing music");
+//        return;
+//    }
+//
+//    let channel = message.member?.voice.channel;
+//    if (!channel)
+//    {
+//        message.reply("Please join a voice channel first.");
+//        return;
+//    }
+//
+//    if (args[1] === 'stop')
+//    {
+//        stopPlayer(channel.id);
+//        return;
+//    }
+//
+//    if (args[1] === 'leave')
+//    {
+//        leaveChannel(channel.id);
+//        return;
+//    }
+//
+//    if ((args[1] != 'play') && (args[1] != 'playfrom'))
+//    {
+//        message.reply("Invalid command!");
+//        return;
+//    }
+//        
+//    if ((args[1] === 'play') && (args.length == 2)) // Not given anything to play, so attemtp to resume previous
+//    {
+//        let connection = getSavedConnection(channel.id);
+//        if (connection && connection.player)
+//        {
+//            connection.player.unpause();
+//            message.reply("Resuming: " + connection.title);
+//        }
+//        else
+//        {
+//            message.reply("Nothing to play, please give a youtube link or search phrase");
+//        }
+//        return;
+//    }
+//
+//    let ytUrl = args[2];
+//    let startTime = 0;
+//    let queryIndex = args[0].length + 1 + args[1].length + 1;
+//
+//    if (args[1] === 'playfrom')
+//    {
+//        // Factor in the additional time argument
+//        let timeComponents = args[2].split(':');
+//        if (timeComponents.length != 2)
+//        {
+//            message.reply("Please give a time in the format minutes:seconds");
+//            return;
+//        }
+//
+//        startTime = (parseInt(timeComponents[0], 10) * 60) + parseInt(timeComponents[1], 10);
+//        if (isNaN(startTime))
+//        {
+//            message.reply("Please give a time in the format minutes:seconds");
+//            return;
+//        }
+//
+//        ytUrl = args[3];
+//        queryIndex += args[2].length + 1; 
+//    }
+//
+//    if (!ytUrl.includes("youtube.com"))
+//    {
+//        // Not given a url, search this term instead
+//        let query = message.content.slice(queryIndex);
+//        ytUrl = await yt.search(query);
+//    }
+//
+//    if (!ytUrl)
+//    {
+//        message.reply("Unable to find video specified");
+//        return;
+//    }
+//
+//    // Stop audio to avoid hearing a hiccup while the new file downloads
+//    stopPlayer(channel.id);
+//
+//    let dlResult;
+//    try
+//    {
+//        dlResult = await yt.download(ytUrl, "audio-" + channel.id);
+//    }
+//    catch (e)
+//    {
+//        message.reply("Failed to obtain video: " + e);
+//        return;
+//    }
+//
+//    if (!dlResult || !dlResult.filename)
+//    {
+//        message.reply("Failed to obtain audio");
+//        return;
+//    }
+//
+//    let audioFile = AUDIO_DIR + dlResult.filename;
+//    
+//    if (startTime != 0)
+//    {
+//        // trim video start time
+//        await trimAudio(audioFile, startTime);
+//    }
+//
+//    let connection = getSavedConnection(channel.id);
+//    if (!connection)
+//    {
+//        try
+//        {
+//            connection = await joinChannel(channel);
+//        }
+//        catch (error)
+//        {
+//            message.reply("Encountered an error...");
+//            console.error("Failed to subscribe call player");
+//            console.error(error);
+//            return;
+//        }
+//    }
+//
+//    if (connection)
+//    {
+//        connection.title = dlResult.title;
+//    }
+//
+//    let nowPlayingReply = "Now playing: '" + dlResult.title + "'";
+//    if (startTime > 0)
+//    {
+//        nowPlayingReply += " starting from " + Math.floor(startTime / 60) + ":";
+//        if ((startTime % 60) < 10) nowPlayingReply += "0";
+//        nowPlayingReply += startTime % 60;
+//    }
+//    message.reply(nowPlayingReply);
+//
+//    try
+//    {
+//        await playSound(connection.player, audioFile);
+//    }
+//    catch(error)
+//    {
+//        
+//        message.reply("Encountered an error...");
+//        console.error("Failed to play audio"); 
+//        console.error(error);
+//    }
+//}
+
 var playHelp =
-    "**!music** <option>\n" +
-    "--- Plays the audio from the given youtube url. Options are:\n" +
-    "    play [youtube_link | search_phrase] - starts playing music from a link or search term\n" +
-    "    playfrom <start_time_minutes> <youtube_link | search_phrase> - Plays starting from given minute mark\n" +
-    "    stop - Stops current music. Enter '!music play' to resume\n" +
-    "    leave - Stop music and makes the bot leave the voice channel\n";
+    "**!play** [options] <search_phrase | soundcloud_link> \n" +
+    "--- Plays the audio from the given soundcloud url or search term. Options are:\n" +
+    "    'stop' - Stops current music\n" +
+    "    'resume' - Resumes the last music that was stopped\n" + 
+    "    'leave' - Stop music and makes the bot leave the voice channel\n" + 
+    "    'from <minutes:seconds>' - Plays from the given start timestamp\n";
 
 async function playCmd(message, args)
 {
+    let streamInfo = null;
+    let stream = null;
+    let queryIndex = args[0].length + 1;
+    let startMs = 0;
+
     if (args.length < 2)
     {
         message.reply("Please include a youtube linke, or 'stop' or 'leave' to stop playing music");
@@ -284,9 +526,11 @@ async function playCmd(message, args)
 
     if (args[1] === 'stop')
     {
-        stopPlayer(channel.id);
+        stopPlayer(channel.id, message);
         return;
     }
+
+        
 
     if (args[1] === 'leave')
     {
@@ -294,92 +538,20 @@ async function playCmd(message, args)
         return;
     }
 
-    if ((args[1] != 'play') && (args[1] != 'playfrom'))
+    if (args[1] == 'from')
     {
-        message.reply("Invalid command!");
-        return;
-    }
-        
-    if ((args[1] === 'play') && (args.length == 2)) // Not given anything to play, so attemtp to resume previous
-    {
-        let connection = getSavedConnection(channel.id);
-        if (connection && connection.player)
-        {
-            connection.player.unpause();
-            message.reply("Resuming: " + connection.title);
-        }
-        else
-        {
-            message.reply("Nothing to play, please give a youtube link or search phrase");
-        }
-        return;
-    }
-
-    let ytUrl = args[2];
-    let startTime = 0;
-    let queryIndex = args[0].length + 1 + args[1].length + 1;
-
-    if (args[1] === 'playfrom')
-    {
-        // Factor in the additional time argument
-        let timeComponents = args[2].split(':');
-        if (timeComponents.length != 2)
+        startMs = timeStrToMs(args[2]);
+        if (isNaN(startMs) || (startMs < 0))
         {
             message.reply("Please give a time in the format minutes:seconds");
             return;
         }
 
-        startTime = (parseInt(timeComponents[0], 10) * 60) + parseInt(timeComponents[1], 10);
-        if (isNaN(startTime))
-        {
-            message.reply("Please give a time in the format minutes:seconds");
-            return;
-        }
-
-        ytUrl = args[3];
-        queryIndex += args[2].length + 1; 
-    }
-
-    if (!ytUrl.includes("youtube.com"))
-    {
-        // Not given a url, search this term instead
-        let query = message.content.slice(queryIndex);
-        ytUrl = await yt.search(query);
-    }
-
-    if (!ytUrl)
-    {
-        message.reply("Unable to find video specified");
-        return;
+        queryIndex = message.content.indexOf(args[2]) + args[2].length + 1; 
     }
 
     // Stop audio to avoid hearing a hiccup while the new file downloads
     stopPlayer(channel.id);
-
-    let dlResult;
-    try
-    {
-        dlResult = await yt.download(ytUrl, "audio-" + channel.id);
-    }
-    catch (e)
-    {
-        message.reply("Failed to obtain video: " + e);
-        return;
-    }
-
-    if (!dlResult || !dlResult.filename)
-    {
-        message.reply("Failed to obtain audio");
-        return;
-    }
-
-    let audioFile = AUDIO_DIR + dlResult.filename;
-    
-    if (startTime != 0)
-    {
-        // trim video start time
-        await trimAudio(audioFile, startTime);
-    }
 
     let connection = getSavedConnection(channel.id);
     if (!connection)
@@ -397,23 +569,65 @@ async function playCmd(message, args)
         }
     }
 
-    if (connection)
+    if (args[1] === 'resume')
     {
-        connection.title = dlResult.title;
+        connection.player.unpause();
+        return;
     }
 
-    let nowPlayingReply = "Now playing: '" + dlResult.title + "'";
-    if (startTime > 0)
+    let query = message.content.slice(queryIndex);
+    if (query.includes("soundcloud.com"))
     {
-        nowPlayingReply += " starting from " + Math.floor(startTime / 60) + ":";
-        if ((startTime % 60) < 10) nowPlayingReply += "0";
-        nowPlayingReply += startTime % 60;
+        try
+        {
+            streamInfo = await playdl.soundcloud(query);
+        }
+        catch (error)
+        {
+            message.reply("Could not find link on soundcloud");
+            console.error("Soundcloud url lookup failed:");
+            console.error(error);
+        }
     }
+    else
+    {
+        try
+        {
+            let searchResults = await playdl.search(query, {
+                source: { soundcloud: 'tracks' }});
+            streamInfo = searchResults[0];
+        }
+        catch (error)
+        {
+            message.reply("Could not find search on Soundcloud");
+            console.error("Soundcloud search failed:");
+            console.error(error);
+        }
+    }
+
+    let nowPlayingReply = "Now playing: '" + streamInfo.name + "'";
     message.reply(nowPlayingReply);
+
+    let streamOptions = {};
+    if (startMs > 0)
+    {
+        streamOptions.seek = Math.floor(startMs / 1000);
+    }
 
     try
     {
-        await playSound(connection.player, audioFile);
+        stream = await playdl.stream_from_info(streamInfo, streamOptions);
+    }
+    catch (error)
+    {
+        message.reply("Failed to stream from soundcloud");
+        console.error("Get stream from soundcloud failed:");
+        console.error(error);
+    }
+
+    try
+    {
+        await playStream(connection, stream);
     }
     catch(error)
     {
@@ -423,7 +637,6 @@ async function playCmd(message, args)
         console.error(error);
     }
 }
-
 async function playPokeCall(message, audioFile)
 {
 
@@ -455,7 +668,7 @@ async function playPokeCall(message, audioFile)
 
     try
     {
-        await playSound(connection.player, audioFile);
+        await playSound(channel.id, audioFile);
     }
     catch(error)
     {
@@ -472,7 +685,7 @@ exports.gnome =
     cmd:  gnomeCommand
 };
 
-exports.playYt =
+exports.play =
 {
     help: playHelp,
     cmd: playCmd
