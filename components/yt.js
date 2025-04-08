@@ -7,7 +7,7 @@ const YT_URL = "https://www.youtube.com/watch?v=";
 const DL_PATH = __dirname + "/../audio/"
 
 const MAX_SEARCH_RES = 10;
-const MAX_AUDIO_SIZE = (500 * 1024 * 1024); // 100 MB
+const MAX_AUDIO_SIZE = (100 * 1024 * 1024); // 100 MB
 
 var ytHelp =
     "**!yt** <search>\n" +
@@ -69,18 +69,22 @@ async function download(url, filename)
         return;
     }
 
-    let format = ytdl.chooseFormat(audioFormats, {quality: "highestaudio"});
+    // Filter out alternate languages
+    let audioFormatsFiltered = [];
+    audioFormats.map((audioFormat) =>
+        {
+            if ((audioFormat.audioTrack == undefined) ||
+                (audioFormat.audioTrack.audioIsDefault))
+            {
+                audioFormatsFiltered.push(audioFormat);
+            }
+        });
+
+    let format = ytdl.chooseFormat(audioFormatsFiltered, {quality: "highestaudio"});
     if (!format)
     {
         console.error("YTDL: Failed to select audio format");
         throw "Valid download format not found"
-        return;
-    }
-
-    if (format.contentLength > MAX_AUDIO_SIZE)
-    {
-        console.error("YTDL: Requested audio is too large");
-        throw "Requested audio is too large";
         return;
     }
 
@@ -101,9 +105,12 @@ async function download(url, filename)
 
             dlStream.on("progress", (size, num, total) => 
                 {
-                    console.log("Size: " + size);
-                    console.log("Num: " + num);
-                    console.log("Total: " + total);
+                    if (num > MAX_AUDIO_SIZE)
+                    {
+                        dlStream.destroy();
+                        writeStream.end();
+                        console.log("Audio capped at " + num);
+                    }
                 });
             let pipeStream = dlStream.pipe(writeStream);
             pipeStream.on("finish", () =>

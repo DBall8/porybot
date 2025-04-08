@@ -156,8 +156,8 @@ addCommand("call",     pokemon.call.cmd,    pokemon.call.help);
 addCommand("yt",       yt.cmd,              yt.help);
 addCommand("gnome",    audio.gnome.cmd,     audio.gnome.help);
 addCommand("card",     magic.card.cmd,      magic.card.help);
-//addCommand("music",    audio.playYt.cmd,    audio.playYt.help);
 addCommand("play",     audio.play.cmd,      audio.play.help);
+addCommand("music",    audio.music.cmd,     audio.music.help);
 
 pokemon.init();
 porybase.init()
