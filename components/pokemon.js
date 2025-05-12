@@ -99,16 +99,24 @@ function collectValidNames(nextUrl)
 
             response.on("end", () =>
                 {
-                    let result = JSON.parse(pokeData);
-                    result.results.map(pokemon => POKE_NAMES.push(pokemon.name));
-                    
-                    if (result.next)
+                    try
                     {
-                        collectValidNames(result.next);
+                        let result = JSON.parse(pokeData);
+                        result.results.map(pokemon => POKE_NAMES.push(pokemon.name));
+                        
+                        if (result.next)
+                        {
+                            collectValidNames(result.next);
+                        }
+                        else
+                        {
+                            console.log("Poke names loaded.");
+                        }
                     }
-                    else
+                    catch (e)
                     {
-                        console.log("Poke names loaded.");
+                        console.error("Failed to load poke name");
+                        console.error(e);
                     }
                 });
         })

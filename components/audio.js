@@ -61,6 +61,40 @@ function stopPlayer(channelId, message)
     savedConn.player.pause();
 }
 
+async function playNext(connection, message)
+{
+
+    let nextStreamInfo = connection.upNext.shift();
+    try
+    {
+        stream = await playdl.stream_from_info(nextStreamInfo, {});
+    }
+    catch (error)
+    {
+        connection.upNext = [];
+
+        console.error("Failed to start next song:");
+        console.error(error);
+    }
+
+    try
+    {
+        await playStream(connection, stream, 0);
+
+        if (message)
+        {
+            let nowPlayingReply = "Now playing: '" + nextStreamInfo.name + "'";
+            message.reply(nowPlayingReply);
+        }
+    }
+    catch(error)
+    {
+        connection.upNext = []; 
+        console.error("Failed to play next song"); 
+        console.error(error);
+    }
+}
+
 function leaveChannel(channelId)
 {
     let savedConn = getSavedConnection(channelId);
@@ -125,10 +159,17 @@ async function joinChannel(channel)
             console.error(error);
         });
 
-//    newVoiceConn.player.on('stateChange', (oldState, newState) =>
-//        {
-//            console.log("STATE " + oldState.status + " => " + newState.status);
-//        });
+    newVoiceConn.player.on('stateChange', (oldState, newState) =>
+        {
+            //console.log("STATE " + oldState.status + " => " + newState.status);
+            if (newState.status == discordVoice.AudioPlayerStatus.Idle)
+            {
+                if (newVoiceConn.upNext && newVoiceConn.upNext.length >= 1)
+                {
+                    playNext(newVoiceConn);
+                }
+            }
+        });
 
     voiceConnection.subscribe(newVoiceConn.player);
 
@@ -141,6 +182,18 @@ async function joinChannel(channel)
     savedVoiceConns[channel.id] = newVoiceConn;
 
     return savedVoiceConns[channel.id];
+}
+
+function shuffleTracks(tracks)
+{
+    let shuffled = []
+    while (tracks.length >= 1)
+    {
+        let randTrackNum = Math.floor(Math.random() * tracks.length);
+        shuffled.push(tracks[randTrackNum]);
+        tracks.splice(randTrackNum, 1);
+    }
+    return shuffled;
 }
 
 async function playSound(channelId, soundFile)
@@ -505,6 +558,7 @@ async function musicCmd(message, args)
     let stream = null;
     let queryIndex = args[0].length + 1;
     let startMs = 0;
+    let shuffle = false;
 
     if (args.length < 2)
     {
@@ -543,6 +597,12 @@ async function musicCmd(message, args)
         queryIndex = message.content.indexOf(args[2]) + args[2].length + 1; 
     }
 
+    if (args[1] == 'shuffle')
+    {
+        shuffle = true;
+        queryIndex = message.content.indexOf(args[1]) + args[1].length + 1; 
+    }
+
     // Stop audio to avoid hearing a hiccup while the new file downloads
     stopPlayer(channel.id);
 
@@ -561,6 +621,13 @@ async function musicCmd(message, args)
             return;
         }
     }
+
+    if (args[1] == 'next')
+    {
+        playNext(connection, message);
+        return;
+    }
+
 
     if (args[1] === 'resume')
     {
@@ -596,6 +663,23 @@ async function musicCmd(message, args)
             console.error("Soundcloud search failed:");
             console.error(error);
         }
+    }
+    
+    connection.upNext = [];
+    if (streamInfo.type == 'playlist')
+    {
+        connection.upNext = await streamInfo.all_tracks();
+        if (!connection.upNext || connection.upNext.length <= 0)
+        {
+            message.reply("Problem loading playlist");
+            return;
+        }
+
+        if (shuffle)
+        {
+            connection.upNext = shuffleTracks(connection.upNext);
+        }
+        streamInfo = connection.upNext.shift();
     }
 
     let nowPlayingReply = "Now playing: '" + streamInfo.name + "'";
