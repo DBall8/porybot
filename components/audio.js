@@ -550,7 +550,9 @@ var musicHelp =
     "    'stop' - Stops current music\n" +
     "    'resume' - Resumes the last music that was stopped\n" + 
     "    'leave' - Stop music and makes the bot leave the voice channel\n" + 
-    "    'from <minutes:seconds>' - Plays from the given start timestamp\n";
+    "    'from <minutes:seconds>' - Plays from the given start timestamp\n" +
+    "    'shuffle <playlist_url>' - Plays a playlist, shuffled\n" +
+    "    'next' - If playing a playlist, skips to the next track\n";
 
 async function musicCmd(message, args)
 {
